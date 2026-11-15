@@ -536,11 +536,11 @@ public class MapGenerator {
 
     private static String jsonEsc(String value) {
         if (value == null) return "";
-        return value.replace("\\\\", "\\\\\\\\")
-            .replace("\\"", "\\\\\"")
-            .replace("\\r", "")
-            .replace("\\n", "\\\\n")
-            .replace("\\t", "\\\\t");
+        return value.replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\r", "")
+            .replace("\n", "\\n")
+            .replace("\t", "\\t");
     }
 
     private static void openHostedMap(String title, String subtitle, double lat, double lon,
