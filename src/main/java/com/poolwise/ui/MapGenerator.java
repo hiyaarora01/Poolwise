@@ -49,12 +49,36 @@ public class MapGenerator {
 
     // ── Public entry points ───────────────────────────────────────
 
+    private static final String HOSTED_MAP_URL =
+        "https://poolwise-map-viewer-alpyxf04a-hiya23.vercel.app/";
+
     public static void openCarpoolMap(Carpool carpool) {
         try {
-            String html = hasApiKey()
-                ? buildGoogleCarpoolHtml(carpool)
-                : buildLeafletCarpoolHtml(carpool);
-            openHtml(html, "carpool_" + carpool.getCarpoolId());
+            Driver d = carpool.getDriver();
+            List<Passenger> passengers = carpool.getPassengers();
+            double centerLat = d.getStartLat() + d.getDestLat();
+            double centerLon = d.getStartLon() + d.getDestLon();
+            StringBuilder points = new StringBuilder();
+            StringBuilder route = new StringBuilder();
+            addMapPoint(points, d.getStartLat(), d.getStartLon(), d.getName() + " — Start", d.getStartLocation());
+            appendRoutePoint(route, d.getStartLon(), d.getStartLat());
+            addMapPoint(points, d.getDestLat(), d.getDestLon(), "Destination", d.getDestination());
+            for (Passenger p : passengers) {
+                centerLat += p.getPickupLat();
+                centerLon += p.getPickupLon();
+                addMapPoint(points, p.getPickupLat(), p.getPickupLon(), p.getName() + " — Pickup", p.getPickupLocation());
+                double[] meet = nearestPointOnSegment(d.getStartLat(), d.getStartLon(), d.getDestLat(), d.getDestLon(),
+                    p.getPickupLat(), p.getPickupLon());
+                addMapPoint(points, meet[0], meet[1], "Meeting point — " + p.getName(), "Suggested meeting point");
+                appendRoutePoint(route, p.getPickupLon(), p.getPickupLat());
+            }
+            appendRoutePoint(route, d.getDestLon(), d.getDestLat());
+            centerLat /= passengers.size() + 2;
+            centerLon /= passengers.size() + 2;
+            String subtitle = "Driver: " + d.getName() + " | Passengers: " + passengers.size()
+                + " | Extra distance: " + String.format("%.2f km", carpool.getExtraDistanceKm());
+            openHostedMap("POOLWISE — " + carpool.getCarpoolId(), subtitle,
+                centerLat, centerLon, 12, points.toString(), route.toString());
         } catch (Exception e) {
             LOG.severe("Map error: " + e.getMessage());
         }
@@ -62,10 +86,19 @@ public class MapGenerator {
 
     public static void openMeetingPointMap(Driver driver, Passenger passenger) {
         try {
-            String html = hasApiKey()
-                ? buildGoogleMeetingHtml(driver, passenger)
-                : buildLeafletMeetingHtml(driver, passenger);
-            openHtml(html, "meeting_" + driver.getUserId() + "_" + passenger.getUserId());
+            double[] meet = nearestPointOnSegment(driver.getStartLat(), driver.getStartLon(),
+                driver.getDestLat(), driver.getDestLon(), passenger.getPickupLat(), passenger.getPickupLon());
+            StringBuilder points = new StringBuilder();
+            addMapPoint(points, driver.getStartLat(), driver.getStartLon(), driver.getName() + " — Start", driver.getStartLocation());
+            addMapPoint(points, driver.getDestLat(), driver.getDestLon(), "Destination", driver.getDestination());
+            addMapPoint(points, passenger.getPickupLat(), passenger.getPickupLon(), passenger.getName() + " — Pickup", passenger.getPickupLocation());
+            addMapPoint(points, meet[0], meet[1], "Suggested Meeting Point", "Meeting point for " + passenger.getName());
+            String route = "[" + routePoint(driver.getStartLon(), driver.getStartLat()) + ","
+                + routePoint(meet[1], meet[0]) + "," + routePoint(driver.getDestLon(), driver.getDestLat()) + "]";
+            openHostedMap("POOLWISE — Meeting Point", driver.getName() + " & " + passenger.getName(),
+                (driver.getStartLat() + driver.getDestLat() + passenger.getPickupLat()) / 3,
+                (driver.getStartLon() + driver.getDestLon() + passenger.getPickupLon()) / 3,
+                12, points.toString(), route);
         } catch (Exception e) {
             LOG.severe("Meeting-point map error: " + e.getMessage());
         }
@@ -73,10 +106,27 @@ public class MapGenerator {
 
     public static void openDriverOverviewMap(Driver driver, List<Passenger> nearby) {
         try {
-            String html = hasApiKey()
-                ? buildGoogleDriverHtml(driver, nearby)
-                : buildLeafletDriverHtml(driver, nearby);
-            openHtml(html, "driver_" + driver.getUserId());
+            double centerLat = driver.getStartLat() + driver.getDestLat();
+            double centerLon = driver.getStartLon() + driver.getDestLon();
+            StringBuilder points = new StringBuilder();
+            StringBuilder route = new StringBuilder();
+            addMapPoint(points, driver.getStartLat(), driver.getStartLon(), driver.getName() + " — Start", driver.getStartLocation());
+            addMapPoint(points, driver.getDestLat(), driver.getDestLon(), "Destination", driver.getDestination());
+            appendRoutePoint(route, driver.getStartLon(), driver.getStartLat());
+            for (Passenger p : nearby) {
+                centerLat += p.getPickupLat();
+                centerLon += p.getPickupLon();
+                addMapPoint(points, p.getPickupLat(), p.getPickupLon(), p.getName() + " — Pickup", p.getPickupLocation());
+                double[] meet = nearestPointOnSegment(driver.getStartLat(), driver.getStartLon(),
+                    driver.getDestLat(), driver.getDestLon(), p.getPickupLat(), p.getPickupLon());
+                addMapPoint(points, meet[0], meet[1], "Meeting point — " + p.getName(), "Suggested meeting point");
+            }
+            appendRoutePoint(route, driver.getDestLon(), driver.getDestLat());
+            centerLat /= nearby.size() + 2;
+            centerLon /= nearby.size() + 2;
+            openHostedMap("POOLWISE — Driver Route: " + driver.getName(),
+                driver.getStartLocation() + " → " + driver.getDestination() + " | " + nearby.size() + " nearby passengers",
+                centerLat, centerLon, 12, points.toString(), route.toString());
         } catch (Exception e) {
             LOG.severe("Driver map error: " + e.getMessage());
         }
@@ -460,6 +510,53 @@ public class MapGenerator {
     }
     private static String lCircle(double lat, double lon, String color, String title, String popup) {
         return "L.circleMarker(["+lat+","+lon+"],{radius:8,color:'"+color+"',fillColor:'"+color+"',fillOpacity:.7,weight:2}).addTo(map).bindPopup('"+jsEsc(popup)+"').bindTooltip('"+jsEsc(title)+"');\n";
+    }
+
+    // ── Hosted Vercel map viewer ──────────────────────────────────
+
+    private static void addMapPoint(StringBuilder points, double lat, double lon, String title, String popup) {
+        if (points.length() > 0) points.append(",");
+        points.append("{\"lat\":").append(lat)
+            .append(",\"lon\":").append(lon)
+            .append(",\"title\":\"").append(jsonEsc(title))
+            .append("\",\"popup\":\"").append(jsonEsc(popup)).append("\"}");
+    }
+
+    private static void appendRoutePoint(StringBuilder route, double lon, double lat) {
+        if (route.length() == 0) route.append("[");
+        else route.append(",");
+        route.append(routePoint(lon, lat));
+    }
+
+    private static String routePoint(double lon, double lat) {
+        return "[" + lon + "," + lat + "]";
+    }
+
+    private static String jsonEsc(String value) {
+        if (value == null) return "";
+        return value.replace("\\\\", "\\\\\\\\")
+            .replace("\"", "\\\\\"")
+            .replace("\\r", "")
+            .replace("\\n", "\\\\n")
+            .replace("\\t", "\\\\t");
+    }
+
+    private static void openHostedMap(String title, String subtitle, double lat, double lon,
+            int zoom, String pointsJson, String routeJson) throws Exception {
+        String data = "{\"title\":\"" + jsonEsc(title)
+            + "\",\"subtitle\":\"" + jsonEsc(subtitle)
+            + "\",\"center\":[" + lat + "," + lon + "]"
+            + ",\"zoom\":" + zoom
+            + ",\"points\":[" + pointsJson + "]"
+            + ",\"route\":" + routeJson + "]}";
+        String url = HOSTED_MAP_URL + "?data="
+            + java.net.URLEncoder.encode(data, StandardCharsets.UTF_8);
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            Desktop.getDesktop().browse(java.net.URI.create(url));
+        } else {
+            throw new IOException("No supported browser is available to open the hosted map.");
+        }
+        LOG.info("Opened hosted POOLWISE map: " + url);
     }
 
     // ── Geometry ──────────────────────────────────────────────────
