@@ -1,0 +1,10 @@
+# POOLWISE Passengers CSV
+# userId,name,phone,reliability,pickupLoc,pickupLat,pickupLon,dest,destLat,destLon,arrivalTime,maxWait,maxDetour,available,assignedDriverId
+P001,Amit Kumar,9811223344,0.9,Karol Bagh,28.6519,77.1902,IIT Delhi,28.5459,77.1926,09:30,20.0,4.0,true,D005
+P002,Sneha Patel,9922334455,0.85,Rajouri Garden,28.6485,77.1225,IIT Delhi,28.5459,77.1926,09:30,25.0,5.0,true,D001
+P003,Vikram Nair,9733445566,0.88,Lajpat Nagar,28.5706,77.2434,IIT Delhi,28.5459,77.1926,09:30,15.0,3.0,true,D004
+P004,Priti Verma,9644556677,0.82,Saket,28.5244,77.2167,IIT Delhi,28.5459,77.1926,09:30,20.0,4.0,true,D004
+P005,Rohan Gupta,9555667788,0.79,Dwarka,28.5823,77.05,IIT Delhi,28.5459,77.1926,09:30,30.0,6.0,true,D001
+P006,Nisha Reddy,9466778899,0.91,Vasant Kunj,28.5244,77.15,IIT Delhi,28.5459,77.1926,09:30,20.0,5.0,true,D001
+P007,Deepak Joshi,9377889900,0.86,Kashmiri Gate,28.6353,77.225,IIT Delhi,28.5459,77.1926,09:15,15.0,3.0,true,D002
+P008,Anjali Singh,9288990011,0.83,Karol Bagh,28.6519,77.1902,IIT Delhi,28.5459,77.1926,09:30,25.0,4.0,true,D005

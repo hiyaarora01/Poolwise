@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Run POOLWISE",
+            "request": "launch",
+            "mainClass": "com.poolwise.Main",
+            "projectName": "Poolwise",
+            "classPaths": ["${workspaceFolder}/out"],
+            "sourcePaths": ["${workspaceFolder}/src/main/java"],
+            "vmArgs": "-Xmx512m -Xms128m"
+        }
+    ]
+}

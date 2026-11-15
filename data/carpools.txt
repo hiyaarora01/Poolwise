@@ -1,0 +1,31 @@
+# POOLWISE Carpool Arrangements
+# Generated: 2026-11-15T19:09:05.877554200
+
+CARPOOL [CP-1]
+  Driver    : Rahul Sharma
+  Passengers: Sneha Patel, Rohan Gupta, Nisha Reddy, 
+  Extra km  : 26.77
+  CO2 Saved : -0.75 kg
+  Route     : Connaught Place → Rajouri Garden → Dwarka → Vasant Kunj → IIT Delhi
+---
+CARPOOL [CP-2]
+  Driver    : Mehak Kapoor
+  Passengers: Vikram Nair, Anjali Singh, 
+  Extra km  : 20.62
+  CO2 Saved : -1.86 kg
+  Route     : AIIMS → Lajpat Nagar → Karol Bagh → IIT Delhi
+---
+CARPOOL [CP-3]
+  Driver    : Arjun Mehta
+  Passengers: Deepak Joshi, Amit Kumar, 
+  Extra km  : 7.27
+  CO2 Saved : 2.86 kg
+  Route     : Kashmiri Gate → Kashmiri Gate → Karol Bagh → IIT Delhi
+---
+CARPOOL [CP-4]
+  Driver    : Priya Singh
+  Passengers: Priti Verma, 
+  Extra km  : 5.55
+  CO2 Saved : 4.91 kg
+  Route     : Ghaziabad → Saket → IIT Delhi
+---

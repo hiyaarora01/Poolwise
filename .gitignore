@@ -1,0 +1,28 @@
+# Compiled Java class files
+out/
+*.class
+
+# VS Code settings (optional — keep launch.json for teammates)
+.vscode/settings.json
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# IntelliJ / Eclipse
+.idea/
+*.iml
+.project
+.classpath
+
+# Maven target (not used here, but just in case)
+target/
+
+# Temporary HTML maps generated at runtime
+data/maps/
+
+# Log files
+*.log
