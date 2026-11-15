@@ -73,6 +73,7 @@ public class MapGenerator {
                 appendRoutePoint(route, p.getPickupLon(), p.getPickupLat());
             }
             appendRoutePoint(route, d.getDestLon(), d.getDestLat());
+            route.append("]");
             centerLat /= passengers.size() + 2;
             centerLon /= passengers.size() + 2;
             String subtitle = "Driver: " + d.getName() + " | Passengers: " + passengers.size()
@@ -122,6 +123,7 @@ public class MapGenerator {
                 addMapPoint(points, meet[0], meet[1], "Meeting point — " + p.getName(), "Suggested meeting point");
             }
             appendRoutePoint(route, driver.getDestLon(), driver.getDestLat());
+            route.append("]");
             centerLat /= nearby.size() + 2;
             centerLon /= nearby.size() + 2;
             openHostedMap("POOLWISE — Driver Route: " + driver.getName(),
@@ -535,7 +537,7 @@ public class MapGenerator {
     private static String jsonEsc(String value) {
         if (value == null) return "";
         return value.replace("\\\\", "\\\\\\\\")
-            .replace("\"", "\\\\\"")
+            .replace("\\"", "\\\\\"")
             .replace("\\r", "")
             .replace("\\n", "\\\\n")
             .replace("\\t", "\\\\t");
