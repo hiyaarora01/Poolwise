@@ -50,7 +50,7 @@ public class MapGenerator {
     // ── Public entry points ───────────────────────────────────────
 
     private static final String HOSTED_MAP_URL =
-        "https://poolwise-map-viewer-alpyxf04a-hiya23.vercel.app/";
+        "https://poolwise-map-viewer.vercel.app/";
 
     public static void openCarpoolMap(Carpool carpool) {
         try {
