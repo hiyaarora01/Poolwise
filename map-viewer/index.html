@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>POOLWISE Maps</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    *{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Arial,sans-serif;background:#f8fafc}
+    header{height:64px;padding:10px 20px;background:linear-gradient(120deg,#1e40af,#0369a1);color:white;display:flex;align-items:center;gap:14px}
+    .brand{font-size:20px;font-weight:800;color:#bfdbfe}.heading{font-size:14px;font-weight:700}.sub{font-size:12px;color:#dbeafe;margin-top:4px}
+    #map{height:calc(100% - 64px);width:100%}
+    .error{padding:20px;color:#991b1b;background:#fee2e2}
+  </style>
+</head>
+<body>
+  <header><div class="brand">POOLWISE</div><div><div class="heading" id="heading">Map &amp; Route Viewer</div><div class="sub" id="subtitle">OpenStreetMap · Leaflet</div></div></header>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    (() => {
+      const params = new URLSearchParams(location.search);
+      let payload = {};
+      try {
+        const raw = params.get("data");
+        if (raw) payload = JSON.parse(raw);
+      } catch (e) {
+        document.getElementById("subtitle").textContent = "Invalid map data received from POOLWISE";
+      }
+      document.getElementById("heading").textContent = payload.title || "Map & Route Viewer";
+      document.getElementById("subtitle").textContent = payload.subtitle || "OpenStreetMap · Leaflet";
+      const fallbackCenter = [28.3670, 79.4304];
+      const center = Array.isArray(payload.center) && payload.center.length === 2 ? payload.center : fallbackCenter;
+      const map = L.map("map").setView(center, Number(payload.zoom) || 12);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+      const points = Array.isArray(payload.points) ? payload.points : [];
+      points.forEach(p => {
+        if (!Number.isFinite(Number(p.lat)) || !Number.isFinite(Number(p.lon))) return;
+        const marker = L.marker([Number(p.lat), Number(p.lon)]).addTo(map);
+        if (p.title || p.popup) marker.bindPopup(String(p.popup || p.title));
+      });
+      const route = Array.isArray(payload.route) ? payload.route : [];
+      if (route.length >= 2) {
+        const coords = route.map(p => [Number(p[1]), Number(p[0])]);
+        fetch("https://router.project-osrm.org/route/v1/driving/" +
+          route.map(p => Number(p[0]) + "," + Number(p[1])).join(";") +
+          "?overview=full&geometries=geojson")
+          .then(r => { if (!r.ok) throw new Error("Routing service unavailable"); return r.json(); })
+          .then(d => {
+            if (d.code !== "Ok" || !d.routes || !d.routes.length) throw new Error("No road route found");
+            const line = L.geoJSON(d.routes[0].geometry, {style:{color:"#2563eb",weight:5,opacity:.9}}).addTo(map);
+            map.fitBounds(line.getBounds().pad(.12));
+          })
+          .catch(() => {
+            const line = L.polyline(coords, {color:"#2563eb",weight:4,dashArray:"8 6"}).addTo(map);
+            map.fitBounds(line.getBounds().pad(.12));
+          });
+      } else if (points.length) {
+        const bounds = L.latLngBounds(points.map(p => [Number(p.lat), Number(p.lon)]));
+        if (bounds.isValid()) map.fitBounds(bounds.pad(.15));
+      }
+    })();
+  </script>
+</body>
+</html>
