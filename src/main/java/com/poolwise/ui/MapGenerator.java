@@ -444,7 +444,7 @@ public class MapGenerator {
         sb.append("<div id='header'><div class='logo'>&#x1F697; POOLWISE</div><div class='info'><h1>").append(esc(title)).append("</h1><p>").append(esc(subtitle)).append("</p></div></div>");
         sb.append("<div id='map'></div><script>");
         sb.append("var map=L.map('map').setView([").append(lat).append(",").append(lon).append("],").append(zoom).append(");");
-        sb.append("L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors',maxZoom:19}).addTo(map);");
+        sb.append("L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors',maxZoom:19}).addTo(map);");
         sb.append("function pwIcon(c,l){return L.divIcon({html:'<div style=\"background:'+c+';width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.4)\"><span style=\"transform:rotate(45deg);display:block;text-align:center;font-size:10px;font-weight:bold;line-height:26px;color:#fff\">'+l+'</span></div>',iconSize:[30,30],iconAnchor:[15,30],popupAnchor:[0,-32],className:''});}");
         sb.append(markersJs);
         sb.append("var wp=").append(waypointsJson).append(";");
