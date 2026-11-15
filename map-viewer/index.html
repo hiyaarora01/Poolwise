@@ -5,12 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>POOLWISE Maps</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
   <style>
     *{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Arial,sans-serif;background:#f8fafc}
     header{height:64px;padding:10px 20px;background:linear-gradient(120deg,#1e40af,#0369a1);color:white;display:flex;align-items:center;gap:14px}
     .brand{font-size:20px;font-weight:800;color:#bfdbfe}.heading{font-size:14px;font-weight:700}.sub{font-size:12px;color:#dbeafe;margin-top:4px}
     #map{height:calc(100% - 64px);width:100%}
     .error{padding:20px;color:#991b1b;background:#fee2e2}
+    .driver-location-marker{width:38px;height:38px;border:3px solid #fff;border-radius:50% 50% 50% 8px;
+      background:#1d4ed8;box-shadow:0 2px 9px rgba(15,23,42,.45);display:flex;align-items:center;
+      justify-content:center;transform:rotate(-45deg)}
+    .driver-location-marker span{font-size:19px;line-height:1;color:#fff;transform:rotate(45deg)}
+    .route-direction-arrow{filter:drop-shadow(0 1px 2px rgba(15,23,42,.45))}
   </style>
 </head>
 <body>
@@ -37,11 +43,49 @@
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
       const points = Array.isArray(payload.points) ? payload.points : [];
+      const driverIcon = L.divIcon({
+        className: "",
+        html: '<div class="driver-location-marker"><span>➤</span></div>',
+        iconSize: [38, 38],
+        iconAnchor: [19, 19],
+        popupAnchor: [0, -20]
+      });
       points.forEach(p => {
         if (!Number.isFinite(Number(p.lat)) || !Number.isFinite(Number(p.lon))) return;
-        const marker = L.marker([Number(p.lat), Number(p.lon)]).addTo(map);
+        const pointTitle = String(p.title || "").toLowerCase();
+        const isDriverStart = pointTitle.includes("start") || pointTitle.includes("driver");
+        const marker = L.marker([Number(p.lat), Number(p.lon)], {
+          icon: isDriverStart ? driverIcon : new L.Icon.Default(),
+          title: String(p.title || "")
+        }).addTo(map);
         if (p.title || p.popup) marker.bindPopup(String(p.popup || p.title));
       });
+
+      // Put visible arrowheads along each route segment to show travel direction.
+      function addRouteDirectionArrows(line) {
+        if (typeof L.polylineDecorator !== "function") return;
+        const arrowStyle = {
+          patterns: [{
+            offset: "12%",
+            repeat: "110px",
+            symbol: L.Symbol.arrowHead({
+              pixelSize: 11,
+              polygon: false,
+              pathOptions: {
+                color: "#123b78",
+                weight: 3,
+                opacity: 1,
+                className: "route-direction-arrow"
+              }
+            })
+          }]
+        };
+        if (typeof line.eachLayer === "function") {
+          line.eachLayer(segment => L.polylineDecorator(segment, arrowStyle).addTo(map));
+        } else {
+          L.polylineDecorator(line, arrowStyle).addTo(map);
+        }
+      }
       const route = Array.isArray(payload.route) ? payload.route : [];
       if (route.length >= 2) {
         const coords = route.map(p => [Number(p[1]), Number(p[0])]);
@@ -52,10 +96,12 @@
           .then(d => {
             if (d.code !== "Ok" || !d.routes || !d.routes.length) throw new Error("No road route found");
             const line = L.geoJSON(d.routes[0].geometry, {style:{color:"#2563eb",weight:5,opacity:.9}}).addTo(map);
+            addRouteDirectionArrows(line);
             map.fitBounds(line.getBounds().pad(.12));
           })
           .catch(() => {
             const line = L.polyline(coords, {color:"#2563eb",weight:4,dashArray:"8 6"}).addTo(map);
+            addRouteDirectionArrows(line);
             map.fitBounds(line.getBounds().pad(.12));
           });
       } else if (points.length) {
