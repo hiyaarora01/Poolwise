@@ -132,14 +132,20 @@
 
     /**
      * Fetches map data from the Java/Render backend.
-     * Used when no ?data= param is present (e.g. direct URL, demo).
+     * If the URL contains ?id=<uuid> (put there by MapGenerator.java after a successful POST),
+     * the backend returns that specific carpool's data.
+     * Without an id, the backend returns the built-in sample payload (demo mode).
      * Exposed globally so the "Retry" button can call it.
      */
     async function initMapFromApi() {
       showOverlay("Fetching map data from server…");
 
       try {
-        const response = await fetch(API_ENDPOINT, {
+        // If the desktop app stored a payload by UUID, fetch that specific one.
+        const mapId = new URLSearchParams(location.search).get("id");
+        const endpoint = mapId ? (API_ENDPOINT + "?id=" + mapId) : API_ENDPOINT;
+
+        const response = await fetch(endpoint, {
           method:  "GET",
           headers: { "Accept": "application/json" }
         });

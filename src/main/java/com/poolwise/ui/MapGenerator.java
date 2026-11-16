@@ -4,11 +4,15 @@ import com.poolwise.model.*;
 
 import java.awt.Desktop;
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Map Generator — Google Maps JavaScript API + OpenStreetMap fallback.
@@ -51,6 +55,10 @@ public class MapGenerator {
 
     private static final String HOSTED_MAP_URL =
         "https://poolwise-map-viewer.vercel.app/";
+
+    /** Render backend — receives POSTed payloads and hands them back to the browser by UUID. */
+    private static final String MAP_API_URL =
+        "https://poolwise.onrender.com";
 
     public static void openCarpoolMap(Carpool carpool) {
         try {
@@ -543,28 +551,72 @@ public class MapGenerator {
             .replace("\t", "\\t");
     }
 
+    /**
+     * Posts the JSON payload to the Render backend (stores it and returns a UUID),
+     * then opens the browser with a short ?id=<uuid> URL.
+     *
+     * WHY: Windows ShellExecute has a ~2 KB URL limit. The old ?data=<full-json>
+     * approach silently truncated large payloads, so every carpool showed the same
+     * stale data. The POST+UUID approach uses a ~40-char URL � no truncation ever.
+     *
+     * Falls back to ?data= URL params if the backend is unreachable.
+     */
     private static void openHostedMap(String title, String subtitle, double lat, double lon,
             int zoom, String pointsJson, String routeJson) throws Exception {
+
         String data = "{\"title\":\"" + jsonEsc(title)
             + "\",\"subtitle\":\"" + jsonEsc(subtitle)
             + "\",\"center\":[" + lat + "," + lon + "]"
             + ",\"zoom\":" + zoom
             + ",\"points\":[" + pointsJson + "]"
             + ",\"route\":" + routeJson + "]}";
-        // Append a millisecond timestamp so every click generates a URL the browser
-        // has never seen before. This guarantees a fresh page load in a new tab,
-        // preventing Chrome/Edge from reusing an open Vercel tab and showing the
-        // previous carpool's route instead of this one's.
-        String url = HOSTED_MAP_URL + "?data="
-            + java.net.URLEncoder.encode(data, StandardCharsets.UTF_8)
-            + "&_t=" + System.currentTimeMillis();
-        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            Desktop.getDesktop().browse(java.net.URI.create(url));
-        } else {
+
+        String url;
+        try {
+            String id = postMapPayload(data);
+            url = HOSTED_MAP_URL + "?id=" + id + "&_t=" + System.currentTimeMillis();
+            LOG.info("Payload stored on backend id=" + id);
+        } catch (Exception e) {
+            LOG.warning("POST to map API failed (" + e.getMessage() + "); falling back to ?data= param");
+            url = HOSTED_MAP_URL + "?data="
+                + java.net.URLEncoder.encode(data, StandardCharsets.UTF_8)
+                + "&_t=" + System.currentTimeMillis();
+        }
+
+        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
             throw new IOException("No supported browser is available to open the hosted map.");
         }
+        Desktop.getDesktop().browse(java.net.URI.create(url));
         LOG.info("Opened hosted POOLWISE map: " + url);
     }
+
+    /**
+     * POSTs a raw JSON string to POST /api/map-data on the Render backend.
+     * Returns the UUID assigned by the server.
+     */
+    private static String postMapPayload(String json) throws IOException {
+        URL endpoint = new URL(MAP_API_URL + "/api/map-data");
+        HttpURLConnection conn = (HttpURLConnection) endpoint.openConnection();
+        try {
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setConnectTimeout(6_000);
+            conn.setReadTimeout(6_000);
+            conn.getOutputStream().write(json.getBytes(StandardCharsets.UTF_8));
+
+            if (conn.getResponseCode() != 200) {
+                throw new IOException("Server returned HTTP " + conn.getResponseCode());
+            }
+            String response = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            Matcher m = Pattern.compile("\"id\"\\s*:\\s*\"([^\"]+)\"").matcher(response);
+            if (!m.find()) throw new IOException("No id in API response: " + response);
+            return m.group(1);
+        } finally {
+            conn.disconnect();
+        }
+    }
+
 
     // ── Geometry ──────────────────────────────────────────────────
 
