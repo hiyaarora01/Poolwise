@@ -187,7 +187,7 @@
       document.getElementById("heading").textContent  = payload.title    || "Map & Route Viewer";
       document.getElementById("subtitle").textContent = payload.subtitle || "OpenStreetMap · Leaflet";
 
-      const fallbackCenter = [28.3670, 79.4304];
+      const fallbackCenter = [28.6280, 77.2090];
       const center = Array.isArray(payload.center) && payload.center.length === 2
         ? payload.center
         : fallbackCenter;
