@@ -67,19 +67,19 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     // ─────────────────────────────────────────────────────────────────────────
-    // POOLWISE Map Viewer — frontend fetches map data from the Render backend.
+    // POOLWISE Map Viewer — hybrid data loading strategy:
     //
-    // HOW IT WORKS
-    //   1. On load, initMapFromApi() calls the /api/map-data endpoint on Render.
-    //   2. The JSON payload is validated then handed to renderMap().
-    //   3. renderMap() builds the Leaflet map, markers, and OSRM road route.
+    // SOURCE PRIORITY (checked in order):
+    //   1. ?data= URL parameter  — set by the desktop app's MapGenerator.java.
+    //      This carries the real, live driver/passenger coordinates from the
+    //      running Poolwise application. When present it is used immediately,
+    //      no network request is made.
+    //   2. Render API fetch      — fallback when the page is opened standalone
+    //      (e.g. direct link, demo mode). Calls GET /api/map-data on Render.
     //
     // CONFIGURATION
     //   Set MAP_API_BASE to your Render service URL before deploying to Vercel:
     //     e.g. "https://poolwise-map-api.onrender.com"
-    //   Leave it as an empty string "" during local development — the page will
-    //   call a relative path and your local Java server must be on the same
-    //   origin (or hardcode the localhost URL for dev).
     // ─────────────────────────────────────────────────────────────────────────
 
     const MAP_API_BASE = "https://poolwise.onrender.com";
@@ -107,10 +107,32 @@
       document.getElementById("status-overlay").classList.add("hidden");
     }
 
-    // ── Main entry point ─────────────────────────────────────────
+    // ── Source 1: URL param (desktop app MapGenerator.java) ──────
 
     /**
-     * Fetches map data from the Java/Render backend and renders the Leaflet map.
+     * Tries to read the map payload from the ?data= URL parameter.
+     * MapGenerator.java encodes the full JSON payload (title, subtitle,
+     * center, zoom, points, route) as a URL-encoded string in this param.
+     * Returns the parsed object, or null if the param is absent/invalid.
+     */
+    function tryLoadFromUrlParam() {
+      try {
+        const raw = new URLSearchParams(location.search).get("data");
+        if (!raw) return null;
+        const payload = JSON.parse(raw);
+        validatePayload(payload);
+        return payload;
+      } catch (e) {
+        console.warn("?data= param present but invalid, falling back to API:", e.message);
+        return null;
+      }
+    }
+
+    // ── Source 2: Render API fetch (standalone / demo mode) ──────
+
+    /**
+     * Fetches map data from the Java/Render backend.
+     * Used when no ?data= param is present (e.g. direct URL, demo).
      * Exposed globally so the "Retry" button can call it.
      */
     async function initMapFromApi() {
@@ -282,7 +304,19 @@
     }
 
     // ── Boot ─────────────────────────────────────────────────────
-    initMapFromApi();
+    // Try the URL param first (desktop app passes real data here).
+    // Fall back to the Render API fetch when the page is opened standalone.
+    (function boot() {
+      const urlPayload = tryLoadFromUrlParam();
+      if (urlPayload) {
+        // Real data from MapGenerator.java — render immediately, no fetch needed.
+        hideOverlay();
+        renderMap(urlPayload);
+      } else {
+        // No URL param — fetch from the Render backend (demo / standalone mode).
+        initMapFromApi();
+      }
+    })();
   </script>
 </body>
 </html>
