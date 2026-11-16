@@ -87,9 +87,7 @@ public final class MapApiServer {
     /**
      * Handles {@code GET /api/map-data}.
      *
-     * <p>Returns a sample POOLWISE carpool route around Bareilly, UP as JSON.
-     * Wire this up to your real {@code MatchingService} / {@code RouteService}
-     * when you are ready to serve live data.</p>
+     * <p>Returns a sample POOLWISE carpool route around Delhi/NCR as JSON.</p>
      */
     static final class MapDataHandler implements HttpHandler {
 
@@ -124,42 +122,32 @@ public final class MapApiServer {
             }
         }
 
-        // ── Sample data ─────────────────────────────────────────────────────
-        // Replace this method body with a call to your RouteService /
-        // MatchingService to serve real, dynamic carpool map data.
+        // ── Sample data (Delhi / NCR) ──────────────────────────────────────
         private static MapPayload buildSamplePayload() {
 
-            // Sample points around Bareilly, Uttar Pradesh
+            // Sample points around Delhi / NCR (Connaught Place to IIT Delhi route)
             List<MapPoint> points = List.of(
-                new MapPoint(28.3670, 79.4304, "Alice — Driver Start",
-                             "Alice's home — departs 08:00 AM"),
-                new MapPoint(28.3821, 79.4512, "Bob — Pickup",
-                             "Bob's pickup location — walk < 0.3 km"),
-                new MapPoint(28.3950, 79.4710, "Carol — Pickup",
-                             "Carol's pickup location — walk < 0.4 km"),
-                new MapPoint(28.3568, 79.4190, "Meeting point — Bob",
-                             "Suggested meeting point for Bob"),
-                new MapPoint(28.4100, 79.4900, "Destination — Civil Lines",
-                             "Shared destination: Civil Lines, Bareilly")
+                new MapPoint(28.6280, 77.2090, "Rahul Sharma — Driver Start",
+                             "Connaught Place — departs 09:45 AM | Seats: 3"),
+                new MapPoint(28.5450, 77.1920, "Destination — IIT Delhi",
+                             "Shared destination: Hauz Khas / IIT Delhi")
             );
 
             // Route coordinates in GeoJSON order: [longitude, latitude]
             List<double[]> route = List.of(
-                new double[]{79.4304, 28.3670},   // driver start
-                new double[]{79.4512, 28.3821},   // Bob pickup
-                new double[]{79.4710, 28.3950},   // Carol pickup
-                new double[]{79.4900, 28.4100}    // destination
+                new double[]{77.2090, 28.6280},   // Connaught Place
+                new double[]{77.1920, 28.5450}    // IIT Delhi
             );
 
-            // Map centre = midpoint of driver start and destination
+            // Map centre = midpoint of start and destination
             double[] center = {
-                (28.3670 + 28.4100) / 2.0,   // lat
-                (79.4304 + 79.4900) / 2.0    // lon
+                (28.6280 + 28.5450) / 2.0,   // lat
+                (77.2090 + 77.1920) / 2.0    // lon
             };
 
             return new MapPayload(
-                "POOLWISE — Sample Carpool Route",
-                "Driver: Alice | Passengers: 2 | Extra distance: 1.42 km",
+                "POOLWISE — NCR Carpool Route",
+                "Driver: Rahul Sharma | Route: Connaught Place → IIT Delhi",
                 center,
                 12,
                 points,
@@ -182,11 +170,6 @@ public final class MapApiServer {
     /**
      * Attaches CORS headers so the Vercel-hosted frontend can call this API
      * from any origin without being blocked by the browser's same-origin policy.
-     *
-     * <p>For a production deployment you should restrict
-     * {@code Access-Control-Allow-Origin} to your exact Vercel domain, e.g.:
-     * <pre>  https://poolwise-map-viewer.vercel.app</pre>
-     * and store it in an environment variable on Render.</p>
      */
     static final class CorsFilter {
 
