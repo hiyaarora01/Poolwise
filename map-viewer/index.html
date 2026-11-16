@@ -17,60 +17,191 @@
     .driver-location-marker span{font-size:25px;line-height:1;font-weight:900;color:#fff}
     .route-arrow-icon{background:transparent;border:0}
     .route-arrow-icon svg{width:38px;height:38px;overflow:visible;filter:drop-shadow(0 2px 3px rgba(0,0,0,.7))}
+
+    /* ── Loading / error states ───────────────────────────────── */
+    #status-overlay{
+      position:fixed;inset:0;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      background:rgba(248,250,252,.92);z-index:9999;
+      font-family:Arial,sans-serif;gap:16px
+    }
+    #status-overlay.hidden{display:none}
+    .spinner{
+      width:48px;height:48px;border:5px solid #bfdbfe;
+      border-top-color:#1d4ed8;border-radius:50%;
+      animation:spin .9s linear infinite
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .status-msg{font-size:15px;color:#1e40af;font-weight:600}
+    .status-err{font-size:14px;color:#991b1b;background:#fee2e2;
+      padding:14px 20px;border-radius:8px;max-width:420px;text-align:center;
+      border:1px solid #fca5a5}
+    .retry-btn{
+      padding:8px 20px;background:#1d4ed8;color:#fff;border:none;
+      border-radius:6px;cursor:pointer;font-size:14px;font-weight:600
+    }
+    .retry-btn:hover{background:#1e40af}
   </style>
 </head>
 <body>
-  <header><div class="brand">POOLWISE</div><div><div class="heading" id="heading">Map &amp; Route Viewer</div><div class="sub" id="subtitle">OpenStreetMap · Leaflet</div></div></header>
+  <header>
+    <div class="brand">POOLWISE</div>
+    <div>
+      <div class="heading" id="heading">Map &amp; Route Viewer</div>
+      <div class="sub" id="subtitle">Loading map data…</div>
+    </div>
+  </header>
+
+  <!-- Loading / error overlay — hidden once data arrives -->
+  <div id="status-overlay">
+    <div class="spinner" id="spinner"></div>
+    <p class="status-msg" id="status-msg">Fetching map data from server…</p>
+    <!-- Error card — only shown on failure -->
+    <div class="status-err" id="error-card" style="display:none"></div>
+    <button class="retry-btn" id="retry-btn" style="display:none" onclick="initMapFromApi()">
+      Retry
+    </button>
+  </div>
+
   <div id="map"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    (() => {
-      const params = new URLSearchParams(location.search);
-      let payload = {};
+    // ─────────────────────────────────────────────────────────────────────────
+    // POOLWISE Map Viewer — frontend fetches map data from the Render backend.
+    //
+    // HOW IT WORKS
+    //   1. On load, initMapFromApi() calls the /api/map-data endpoint on Render.
+    //   2. The JSON payload is validated then handed to renderMap().
+    //   3. renderMap() builds the Leaflet map, markers, and OSRM road route.
+    //
+    // CONFIGURATION
+    //   Set MAP_API_BASE to your Render service URL before deploying to Vercel:
+    //     e.g. "https://poolwise-map-api.onrender.com"
+    //   Leave it as an empty string "" during local development — the page will
+    //   call a relative path and your local Java server must be on the same
+    //   origin (or hardcode the localhost URL for dev).
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ▼▼▼  EDIT THIS BEFORE DEPLOYING TO VERCEL  ▼▼▼
+    const MAP_API_BASE = "https://poolwise-map-api.onrender.com";
+    // ▲▲▲  EDIT THIS BEFORE DEPLOYING TO VERCEL  ▲▲▲
+
+    const API_ENDPOINT = MAP_API_BASE + "/api/map-data";
+
+    // ── UI helpers ───────────────────────────────────────────────
+
+    function showOverlay(message) {
+      document.getElementById("status-overlay").classList.remove("hidden");
+      document.getElementById("spinner").style.display    = "block";
+      document.getElementById("status-msg").textContent   = message;
+      document.getElementById("error-card").style.display = "none";
+      document.getElementById("retry-btn").style.display  = "none";
+    }
+
+    function showError(message) {
+      document.getElementById("spinner").style.display    = "none";
+      document.getElementById("status-msg").textContent   = "";
+      document.getElementById("error-card").textContent   = message;
+      document.getElementById("error-card").style.display = "block";
+      document.getElementById("retry-btn").style.display  = "block";
+    }
+
+    function hideOverlay() {
+      document.getElementById("status-overlay").classList.add("hidden");
+    }
+
+    // ── Main entry point ─────────────────────────────────────────
+
+    /**
+     * Fetches map data from the Java/Render backend and renders the Leaflet map.
+     * Exposed globally so the "Retry" button can call it.
+     */
+    async function initMapFromApi() {
+      showOverlay("Fetching map data from server…");
+
       try {
-        const raw = params.get("data");
-        if (raw) payload = JSON.parse(raw);
-      } catch (e) {
-        document.getElementById("subtitle").textContent = "Invalid map data received from POOLWISE";
+        const response = await fetch(API_ENDPOINT, {
+          method:  "GET",
+          headers: { "Accept": "application/json" }
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Server returned ${response.status} ${response.statusText}. ` +
+            `Check that your Render service is running.`
+          );
+        }
+
+        const payload = await response.json();
+        validatePayload(payload);
+        renderMap(payload);
+        hideOverlay();
+
+      } catch (err) {
+        console.error("POOLWISE map fetch failed:", err);
+        showError(
+          "⚠️ Could not load map data.\n\n" +
+          (err.message || String(err)) +
+          "\n\nMake sure the Render backend is live and MAP_API_BASE is correct."
+        );
       }
-      document.getElementById("heading").textContent = payload.title || "Map & Route Viewer";
+    }
+
+    /**
+     * Validates the JSON structure returned by the API.
+     * Throws a descriptive Error if required fields are missing.
+     */
+    function validatePayload(p) {
+      if (!p || typeof p !== "object")
+        throw new Error("API response is not a JSON object.");
+      if (typeof p.title !== "string")
+        throw new Error("Missing field: 'title'");
+      if (!Array.isArray(p.points))
+        throw new Error("Missing field: 'points' (expected array)");
+      if (!Array.isArray(p.route))
+        throw new Error("Missing field: 'route' (expected array)");
+    }
+
+    // ── Map rendering ─────────────────────────────────────────────
+
+    function renderMap(payload) {
+      document.getElementById("heading").textContent  = payload.title    || "Map & Route Viewer";
       document.getElementById("subtitle").textContent = payload.subtitle || "OpenStreetMap · Leaflet";
+
       const fallbackCenter = [28.3670, 79.4304];
-      const points = Array.isArray(payload.points) ? payload.points : [];
-      const driverStart = points.find(p => {
-        const title = String(p.title || "").toLowerCase();
-        return title.includes("start") || title.includes("driver");
-      });
-      const center = driverStart
-        ? [Number(driverStart.lat), Number(driverStart.lon)]
-        : (Array.isArray(payload.center) && payload.center.length === 2 ? payload.center : fallbackCenter);
-      // Always open at the driver's starting point when it is available.
-      const map = L.map("map").setView(center, driverStart ? 14 : (Number(payload.zoom) || 12));
+      const center = Array.isArray(payload.center) && payload.center.length === 2
+        ? payload.center
+        : fallbackCenter;
+
+      const map = L.map("map").setView(center, Number(payload.zoom) || 12);
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
+
+      const points = Array.isArray(payload.points) ? payload.points : [];
       const driverIcon = L.divIcon({
         className: "",
-        html: '<div class="driver-location-marker"><span> D </span></div>',
+        html: '<div class="driver-location-marker"><span>🚗</span></div>',
         iconSize: [52, 52],
         iconAnchor: [26, 26],
         popupAnchor: [0, -28]
       });
+
       points.forEach(p => {
         if (!Number.isFinite(Number(p.lat)) || !Number.isFinite(Number(p.lon))) return;
-        const pointTitle = String(p.title || "").toLowerCase();
+        const pointTitle    = String(p.title || "").toLowerCase();
         const isDriverStart = pointTitle.includes("start") || pointTitle.includes("driver");
         const marker = L.marker([Number(p.lat), Number(p.lon)], {
-          icon: isDriverStart ? driverIcon : new L.Icon.Default(),
+          icon:  isDriverStart ? driverIcon : new L.Icon.Default(),
           title: String(p.title || "")
         }).addTo(map);
         if (p.title || p.popup) marker.bindPopup(String(p.popup || p.title));
       });
 
-      // Place visible direction arrows at evenly spaced positions along each route.
-      // Interpolate by distance so even a two-coordinate fallback route gets three
-      // distinct arrows instead of stacking all arrows at the same midpoint.
+      // Place direction arrows at evenly spaced positions along the route.
+      // Interpolated by real distance so even a two-point fallback route
+      // gets three distinct arrows instead of stacking at the same midpoint.
       function addRouteDirectionArrows(line) {
         const paths = [];
         function collect(layer) {
@@ -103,10 +234,10 @@
             const target = total * fraction;
             let travelled = 0;
             for (let i = 0; i < lengths.length; i++) {
-              const segmentLength = lengths[i];
-              if (travelled + segmentLength >= target || i === lengths.length - 1) {
+              const segLen = lengths[i];
+              if (travelled + segLen >= target || i === lengths.length - 1) {
                 const a = pts[i], b = pts[i + 1];
-                const t = segmentLength ? Math.max(0, Math.min(1, (target - travelled) / segmentLength)) : 0.5;
+                const t = segLen ? Math.max(0, Math.min(1, (target - travelled) / segLen)) : 0.5;
                 const lat = a.lat + (b.lat - a.lat) * t;
                 const lng = a.lng + (b.lng - a.lng) * t;
                 const pa = map.latLngToLayerPoint(a);
@@ -118,39 +249,43 @@
                   iconSize: [38, 38],
                   iconAnchor: [19, 19]
                 });
-                L.marker([lat, lng], {icon, interactive: false, keyboard: false, zIndexOffset: 1000}).addTo(map);
+                L.marker([lat, lng], { icon, interactive: false, keyboard: false, zIndexOffset: 1000 }).addTo(map);
                 break;
               }
-              travelled += segmentLength;
+              travelled += segLen;
             }
           });
         });
       }
+
       const route = Array.isArray(payload.route) ? payload.route : [];
       if (route.length >= 2) {
         const coords = route.map(p => [Number(p[1]), Number(p[0])]);
-        fetch("https://router.project-osrm.org/route/v1/driving/" +
+        fetch(
+          "https://router.project-osrm.org/route/v1/driving/" +
           route.map(p => Number(p[0]) + "," + Number(p[1])).join(";") +
-          "?overview=full&geometries=geojson")
+          "?overview=full&geometries=geojson"
+        )
           .then(r => { if (!r.ok) throw new Error("Routing service unavailable"); return r.json(); })
           .then(d => {
             if (d.code !== "Ok" || !d.routes || !d.routes.length) throw new Error("No road route found");
-            L.geoJSON(d.routes[0].geometry, {style:{color:"#ffffff",weight:13,opacity:1}}).addTo(map);
-            const line = L.geoJSON(d.routes[0].geometry, {style:{color:"#ff1744",weight:8,opacity:1}}).addTo(map);
+            const line = L.geoJSON(d.routes[0].geometry, { style: { color: "#2563eb", weight: 5, opacity: .9 } }).addTo(map);
             addRouteDirectionArrows(line);
+            map.fitBounds(line.getBounds().pad(.12));
           })
           .catch(() => {
-            L.polyline(coords, {color:"#ffffff",weight:13,opacity:1}).addTo(map);
-            const line = L.polyline(coords, {color:"#ff1744",weight:8,opacity:1}).addTo(map);
+            const line = L.polyline(coords, { color: "#2563eb", weight: 4, dashArray: "8 6" }).addTo(map);
             addRouteDirectionArrows(line);
+            map.fitBounds(line.getBounds().pad(.12));
           });
       } else if (points.length) {
-        if (!driverStart) {
-          const bounds = L.latLngBounds(points.map(p => [Number(p.lat), Number(p.lon)]));
-          if (bounds.isValid()) map.fitBounds(bounds.pad(.15));
-        }
+        const bounds = L.latLngBounds(points.map(p => [Number(p.lat), Number(p.lon)]));
+        if (bounds.isValid()) map.fitBounds(bounds.pad(.15));
       }
-    })();
+    }
+
+    // ── Boot ─────────────────────────────────────────────────────
+    initMapFromApi();
   </script>
 </body>
 </html>
