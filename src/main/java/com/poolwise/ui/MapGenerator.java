@@ -551,8 +551,13 @@ public class MapGenerator {
             + ",\"zoom\":" + zoom
             + ",\"points\":[" + pointsJson + "]"
             + ",\"route\":" + routeJson + "]}";
+        // Append a millisecond timestamp so every click generates a URL the browser
+        // has never seen before. This guarantees a fresh page load in a new tab,
+        // preventing Chrome/Edge from reusing an open Vercel tab and showing the
+        // previous carpool's route instead of this one's.
         String url = HOSTED_MAP_URL + "?data="
-            + java.net.URLEncoder.encode(data, StandardCharsets.UTF_8);
+            + java.net.URLEncoder.encode(data, StandardCharsets.UTF_8)
+            + "&_t=" + System.currentTimeMillis();
         if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
             Desktop.getDesktop().browse(java.net.URI.create(url));
         } else {

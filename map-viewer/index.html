@@ -306,6 +306,24 @@
     // ── Boot ─────────────────────────────────────────────────────
     // Try the URL param first (desktop app passes real data here).
     // Fall back to the Render API fetch when the page is opened standalone.
+    //
+    // MapGenerator.java appends &_t=<timestamp> to every URL so the browser
+    // always opens a fresh tab. The visibilitychange listener below is an
+    // additional safety net: if somehow the same tab is reused and the URL
+    // changes (back/forward navigation), we re-read the new URL params.
+    let currentSearch = location.search;
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible" && location.search !== currentSearch) {
+        currentSearch = location.search;
+        const urlPayload = tryLoadFromUrlParam();
+        if (urlPayload) {
+          hideOverlay();
+          renderMap(urlPayload);
+        }
+      }
+    });
+
     (function boot() {
       const urlPayload = tryLoadFromUrlParam();
       if (urlPayload) {
