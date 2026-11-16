@@ -1,166 +1,103 @@
-# 🚗 POOLWISE — Smart Carpool Matching & Route Optimization System
+# POOLWISE — Smart Carpool Matching & Route Optimization
 
-> *"We're not building another carpooling app. We're building the algorithm that decides what the best carpool should look like."*
+POOLWISE is a Java Swing desktop application that demonstrates carpool matching, pickup-route optimization, file-based persistence, and estimated environmental impact.
 
----
+## Requirements
 
-## 📁 Project Structure
+- **JDK 21** (required by the current Maven compiler configuration and source code)
+- Windows for the supplied `.bat` launch scripts
+- Optional: Apache Maven 3.9+ if you prefer Maven commands
+
+## Run on Windows
+
+1. Install a JDK 21 distribution.
+2. Make sure `java` and `javac` are available on PATH, or set `JAVA_HOME` to the JDK installation folder.
+3. From the project root, double-click `compile.bat`.
+4. After a successful build, double-click `run.bat`.
+
+You can also run from PowerShell in the project root:
+
+```powershell
+.compile.bat
+.un.bat
+```
+
+If Maven is installed:
+
+```powershell
+mvn clean package
+java -jar target/poolwise-1.0.0.jar
+```
+
+The Maven build and batch scripts compile the active application in `src/main/java`. Do not compile the legacy source folders as part of the current application.
+
+## Project structure
 
 ```
 Poolwise/
-├── compile.bat              ← Double-click to compile
-├── run.bat                  ← Double-click to run
-├── README.md                ← This file
+├── pom.xml
+├── compile.bat
+├── run.bat
 ├── src/
-│   └── poolwise/
-│       ├── Location.java            Model: GPS coordinate + Haversine distance
-│       ├── User.java                Abstract base: id, name, reliability
-│       ├── Driver.java              Extends User: seats, detour, departure time
-│       ├── Passenger.java           Extends User: arrival time, preferences
-│       ├── OptimizationMode.java    Enum: 5 optimization strategies
-│       ├── CompatibilityScore.java  Multi-factor scoring engine
-│       ├── CarpoolGroup.java        Driver + passengers + route
-│       ├── CarpoolPlan.java         Full plan with environmental impact
-│       ├── CompatibilityMatrix.java All driver×passenger scores
-│       ├── RouteOptimizer.java      Nearest-neighbor pickup ordering
-│       ├── CarpoolOptimizer.java    Main optimization engine (5 modes)
-│       ├── ScenarioSimulator.java   Dynamic scenario testing
-│       ├── DataManager.java         File I/O (save/load drivers, passengers)
-│       └── PoolwiseApp.java         Main application (console menu)
-├── bin/                     ← Compiled .class files (created by compile.bat)
-└── data/                    ← Saved data files (created at runtime)
+│   ├── main/java/com/poolwise/
+│   │   ├── Main.java
+│   │   ├── algorithm/     Graph, DijkstraAlgorithm, GreedyMatcher
+│   │   ├── data/          FileManager
+│   │   ├── exception/     Application-specific exceptions
+│   │   ├── model/         User, Driver, Passenger, Vehicle, Ride, Carpool
+│   │   ├── service/       User, matching, route, and impact services
+│   │   ├── ui/            Swing screens and panels
+│   │   └── util/          Validation and sample-data loading
+│   ├── poolwise/          Legacy source; not used by current Maven build
+│   └── poolwise_backup/  Legacy backup; not used by current Maven build
+└── data/                  CSV data created/used at runtime
 ```
 
----
+## Current application modules
 
-## 🚀 How to Run
+- Login / registration-style welcome screen
+- Dashboard
+- Driver and passenger management
+- Carpool matching with a weighted compatibility score
+- Map and route display based on a predefined sample road network
+- Route calculation using Dijkstra's shortest-path algorithm
+- Pickup ordering using exhaustive permutations for small groups and a nearest-neighbour heuristic for larger groups
+- Environmental impact estimates
+- Scenario simulation
+- CSV-based saving and loading of drivers and passengers
 
-### Step 1 — Install Java JDK
-Download from: https://www.oracle.com/java/technologies/downloads/
-- Choose **JDK 11** or higher
-- During install, check "Add to PATH"
+## Matching and route algorithms
 
-### Step 2 — Compile
-Double-click **`compile.bat`**
+The matching engine uses a **greedy heuristic**. It assigns passengers in required-arrival-time order to the best currently compatible driver while respecting available seats. A greedy heuristic is efficient, but it does **not** guarantee a globally optimal assignment.
 
-### Step 3 — Run
-Double-click **`run.bat`**
+The route module uses Dijkstra's algorithm on a small, predefined Delhi-area graph. This is a teaching/demo network, not live map data or a navigation service. Locations entered by users that are not graph nodes cannot receive a true graph route; the application may use an estimate in that case.
 
----
+## Environmental estimates
 
-## 🎮 Main Menu Options
+The impact calculator uses documented simplifying assumptions in code:
 
-| Option | Description |
-|--------|-------------|
-| 1 | View all drivers and passengers |
-| 2 | Add a new driver (interactive) |
-| 3 | Add a new passenger (interactive) |
-| 4 | View the full Compatibility Matrix |
-| 5 | **Run Optimization** — generates carpool plan |
-| 6 | Change optimization mode |
-| 7 | **Run 3 Dynamic Scenarios** |
-| 8 | **Compare all 5 optimization modes** |
-| 9 | Save data to files |
-| 10 | Load data from files |
-| 0 | Exit |
+- Average fuel efficiency: 12 km/L
+- Petrol combustion factor: 2.31 kg CO₂/L
+- Fuel price assumption: ₹102/L
 
-> The app auto-loads a **sample dataset** (4 drivers, 6 passengers, Delhi area) on startup.
+These figures are illustrative estimates, not measured savings. Actual fuel use and emissions depend on vehicle, route, traffic, occupancy, and driving conditions.
 
----
+## Java concepts demonstrated
 
-## ⚙️ Optimization Modes
+- Classes, objects, constructors, encapsulation
+- Abstract class and inheritance (`User`, `Driver`, `Passenger`)
+- Method overriding and polymorphism
+- Interfaces and the Strategy pattern
+- Association, aggregation, and composition
+- Collections including `ArrayList`, `HashMap`, `HashSet`, and `PriorityQueue`
+- Custom exceptions and input validation
+- File handling with buffered readers/writers and CSV data
+- Swing GUI and event handling
+- Graphs, Dijkstra's algorithm, greedy matching, and route-order heuristics
 
-| Mode | Goal |
-|------|------|
-| 🚗 **MIN_CARS** | Use fewest possible vehicles |
-| ⛽ **MIN_DISTANCE** | Minimize total extra km travelled |
-| ⏱️ **MIN_TIME** | Fastest arrival for all passengers |
-| 🌱 **MIN_CO2** | Most environmentally efficient grouping |
-| ⚖️ **BALANCED** | Compromise across all factors |
+## Important current limitations
 
----
-
-## 🧮 How the Algorithm Works
-
-### 1. Compatibility Scoring
-Every (driver, passenger) pair gets a score from **0.0 to 1.0**:
-
-| Factor | Weight | How Calculated |
-|--------|--------|----------------|
-| Route Overlap | 25% | Cosine similarity of travel direction vectors |
-| Pickup Distance | 25% | `max(0, 1 - dist/5km)` |
-| Detour | 20% | `max(0, 1 - extraKm/maxDetour)` |
-| Time Compatibility | 20% | Arrival time vs required arrival at 60 km/h |
-| Reliability | 5% | Average of driver + passenger reliability |
-| Preferences | 5% | Penalty per passenger preference constraint |
-
-### 2. Greedy Matching
-- Builds a `CompatibilityMatrix` of all scores
-- Sorts pairs by score (or mode-specific comparator)
-- Greedily assigns passengers to drivers, respecting capacity
-
-### 3. Route Optimization
-- Uses **nearest-neighbor greedy** algorithm for pickup order
-- Driver → closest unvisited passenger → next closest → Destination
-- Calculates actual extra distance for each group
-
-### 4. Environmental Impact
-- **CO₂**: 0.21 kg per km per car avoided
-- **Fuel**: 0.08 L per km per car avoided
-
----
-
-## 🧪 Dynamic Scenarios (Option 7)
-
-| Scenario | What Changes |
-|----------|-------------|
-| **Normal Day** | All drivers available → baseline plan |
-| **Driver Cancels** | First driver set unavailable → auto-recalculated |
-| **Reduced Detour** | Max detour reduced to 2 km → new plan |
-
----
-
-## 📚 Java Concepts Used
-
-| Concept | Where Used |
-|---------|-----------|
-| **OOP / Classes** | All 14 classes |
-| **Inheritance** | `Driver`, `Passenger` extend `User` |
-| **Abstract Class** | `User` is abstract |
-| **Enum** | `OptimizationMode` |
-| **Polymorphism** | `getRole()` overridden in Driver/Passenger |
-| **Collections** | `List<>`, `ArrayList<>`, `Set<>`, `HashSet<>` |
-| **File Handling** | `DataManager` — `BufferedReader`, `PrintWriter` |
-| **Exception Handling** | try/catch in DataManager, PoolwiseApp |
-| **Interfaces** (implicit) | Comparator, streams |
-| **Algorithms** | Haversine formula, greedy matching, nearest-neighbor |
-
----
-
-## 📊 Sample Output
-
-```
-╔══════════════════════════════════════════════════╗
-║           POOLWISE — CARPOOL PLAN                ║
-║  Optimization Mode: Balanced Mode                ║
-╚══════════════════════════════════════════════════╝
-
-┌─────────────────────────────────────────┐
-│  CARPOOL GROUP: CP-1
-│  Driver:    Rahul (3 seats)
-│  Passengers (3):
-│    • Amit
-│    • Vikram
-│    • Nisha
-│  Extra Distance: 2.40 km
-│  CO2 Saved: 4.12 kg
-│  Fuel Saved: 1.60 L
-│  Route: Rahul Home → P1 Home → P3 Home → P6 Home → College
-└─────────────────────────────────────────┘
-
-════════════ ENVIRONMENTAL IMPACT SUMMARY ════════════
-  Cars Avoided         : 6
-  Estimated CO2 Saved  : 8.24 kg
-  Estimated Fuel Saved : 3.20 L
-═══════════════════════════════════════════════════════
-```
+- The welcome screen is currently a **demo entry screen**: the sign-in and registration buttons open the application but do not authenticate or persist user accounts.
+- The route graph is predefined and does not query Google Maps or live traffic.
+- Matching and environmental calculations are educational approximations and should be described as such in a project demonstration.
+- The active source of truth is `src/main/java`; the older `src/poolwise` folders are retained for reference and are not part of the current Maven build.
